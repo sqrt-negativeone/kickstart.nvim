@@ -102,7 +102,7 @@ vim.g.have_nerd_font = false
 vim.o.number = true
 -- You can also add relative line numbers, to help with jumping.
 --  Experiment for yourself to see if you like it!
--- vim.o.relativenumber = true
+vim.o.relativenumber = true
 
 -- Enable mouse mode, can be useful for resizing splits for example!
 vim.o.mouse = 'a'
@@ -169,12 +169,35 @@ vim.o.confirm = true
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
 
+-- Remap navigation keys from hjkl to jkl; for normal, visual, and operator-pending modes
+vim.keymap.set({ 'n', 'v', 'o' }, 'j', 'h', { noremap = true })
+vim.keymap.set({ 'n', 'v', 'o' }, 'k', 'j', { noremap = true })
+vim.keymap.set({ 'n', 'v', 'o' }, 'l', 'k', { noremap = true })
+vim.keymap.set({ 'n', 'v', 'o' }, ';', 'l', { noremap = true })
+
+-- Remap command mode from : to '
+vim.keymap.set({ 'n', 'v', 'o' }, "'", ':', { noremap = true })
+
+-- Remap first character in line from 0 to Shift+j (J)
+vim.keymap.set({ 'n', 'v', 'o' }, 'J', '0', { noremap = true })
+
+-- Remap end of line from $ to Shift+; (i.e., :)
+vim.keymap.set({ 'n', 'v', 'o' }, ':', '$', { noremap = true })
+
+-- Remap paragraph movement
+-- Moving to previous paragraph with Shift+K instead of {
+vim.keymap.set({ 'n', 'v', 'o' }, 'L', '{', { noremap = true })
+-- Moving to next paragraph with Shift+L instead of }
+vim.keymap.set({ 'n', 'v', 'o' }, 'K', '}', { noremap = true })
+
 -- Clear highlights on search when pressing <Esc> in normal mode
 --  See `:help hlsearch`
 vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
 
 -- Diagnostic keymaps
 vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
+
+vim.keymap.set('n', '<Tab>', '<C-w>w', { noremap = true, silent = true })
 
 -- Exit terminal mode in the builtin terminal with a shortcut that is a bit easier
 -- for people to discover. Otherwise, you normally need to press <C-\><C-n>, which
@@ -417,6 +440,12 @@ require('lazy').setup({
           ['ui-select'] = {
             require('telescope.themes').get_dropdown(),
           },
+          workspaces = {
+            -- keep insert mode after selection in the picker, default is false
+            keep_insert = true,
+            -- Highlight group used for the path in the picker, default is "String"
+            path_hl = 'String',
+          },
         },
       }
 
@@ -539,10 +568,90 @@ require('lazy').setup({
           --  Useful when your language has ways of declaring types without an actual implementation.
           map('gri', require('telescope.builtin').lsp_implementations, '[G]oto [I]mplementation')
 
+          local function cmd_in_next_window(func)
+            return function()
+              local current_window = vim.api.nvim_get_current_win()
+
+              local wins = vim.api.nvim_tabpage_list_wins(0)
+
+              if #wins == 1 then
+                vim.cmd 'vsplit'
+              else
+                vim.cmd 'wincmd w'
+              end
+
+              func()
+
+              --[[
+              vim.schedule(function()
+                vim.api.nvim_set_current_win(current_win)
+              end)
+              --]]
+            end
+          end
+
+          local function goto_definition_adjacent()
+            local current_win = vim.api.nvim_get_current_win()
+            local wins = vim.api.nvim_tabpage_list_wins(0)
+
+            -- Filter out floating windows
+            local normal_wins = vim.tbl_filter(function(win)
+              local config = vim.api.nvim_win_get_config(win)
+              return not config.relative or config.relative == ''
+            end, wins)
+
+            -- Store the current buffer and cursor position
+            local current_buf = vim.api.nvim_get_current_buf()
+            local cursor_pos = vim.api.nvim_win_get_cursor(current_win)
+
+            if #normal_wins == 1 then
+              -- Create a new split
+              vim.cmd 'vsplit'
+            else
+              -- Move to next window
+              vim.cmd 'wincmd w'
+            end
+
+            local target_win = vim.api.nvim_get_current_win()
+
+            -- Go back to original window to get the definition
+            vim.api.nvim_set_current_win(current_win)
+
+            -- Get the LSP client for position encoding
+            local clients = vim.lsp.get_clients { bufnr = current_buf }
+            if #clients == 0 then
+              print 'No LSP client attached'
+              return
+            end
+
+            -- Request definition and handle the response
+            local params = vim.lsp.util.make_position_params(current_win, clients[1].offset_encoding)
+            vim.lsp.buf_request(current_buf, 'textDocument/definition', params, function(err, result, ctx, config)
+              if err or not result or vim.tbl_isempty(result) then
+                print 'No definition found'
+                return
+              end
+
+              -- Switch to target window and jump to definition
+              vim.api.nvim_set_current_win(target_win)
+
+              -- Handle the location (result can be Location or Location[])
+              local location = result[1] or result
+              vim.lsp.util.show_document(location, 'utf-8', { focus = true, reuse_win = false })
+
+              -- Center the cursor in the window
+              vim.cmd 'normal! zz'
+
+              -- Return to original window
+              vim.api.nvim_set_current_win(current_win)
+            end)
+          end
+
           -- Jump to the definition of the word under your cursor.
           --  This is where a variable was first declared, or where a function is defined, etc.
           --  To jump back, press <C-t>.
-          map('grd', require('telescope.builtin').lsp_definitions, '[G]oto [D]efinition')
+          map('gd', goto_definition_adjacent, '[G]oto [D]efinition in adjacent window')
+          map('gD', require('telescope.builtin').lsp_definitions, '[G]oto [D]efinition in same window')
 
           -- WARN: This is not Goto Definition, this is Goto Declaration.
           --  For example, in C this would take you to the header.
@@ -647,9 +756,9 @@ require('lazy').setup({
       --  - settings (table): Override the default settings passed when initializing the server.
       --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
       local servers = {
-        -- clangd = {},
+        clangd = {},
         -- gopls = {},
-        -- pyright = {},
+        pyright = {},
         -- rust_analyzer = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
@@ -657,7 +766,7 @@ require('lazy').setup({
         --    https://github.com/pmizio/typescript-tools.nvim
         --
         -- But for many setups, the LSP (`ts_ls`) will work just fine
-        -- ts_ls = {},
+        ts_ls = {},
       }
 
       -- Ensure the servers and tools above are installed
@@ -872,9 +981,6 @@ require('lazy').setup({
     end,
   },
 
-  -- Highlight todo, notes, etc in comments
-  { 'folke/todo-comments.nvim', event = 'VimEnter', dependencies = { 'nvim-lua/plenary.nvim' }, opts = { signs = false } },
-
   { -- Collection of various small independent plugins/modules
     'nvim-mini/mini.nvim',
     config = function()
@@ -915,7 +1021,7 @@ require('lazy').setup({
   { -- Highlight, edit, and navigate code
     'nvim-treesitter/nvim-treesitter',
     config = function()
-      local filetypes = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' }
+      local filetypes = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc', 'python' }
       require('nvim-treesitter').install(filetypes)
       vim.api.nvim_create_autocmd('FileType', {
         pattern = filetypes,
@@ -926,6 +1032,9 @@ require('lazy').setup({
     end,
   },
 
+  -- Highlight todo, notes, etc in comments
+  { 'folke/todo-comments.nvim', event = 'VimEnter', dependencies = { 'nvim-lua/plenary.nvim' }, opts = { signs = false } },
+
   -- The following comments only work if you have downloaded the kickstart repo, not just copy pasted the
   -- init.lua. If you want these files, they are in the repository, so you can just download them and
   -- place them in the correct locations.
@@ -935,18 +1044,20 @@ require('lazy').setup({
   --  Here are some example plugins that I've included in the Kickstart repository.
   --  Uncomment any of the lines below to enable them (you will need to restart nvim).
   --
-  -- require 'kickstart.plugins.debug',
-  -- require 'kickstart.plugins.indent_line',
+  require 'kickstart.plugins.debug',
+  require 'kickstart.plugins.indent_line',
   -- require 'kickstart.plugins.lint',
   -- require 'kickstart.plugins.autopairs',
   -- require 'kickstart.plugins.neo-tree',
   -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
 
+  -- require 'custom.plugins.neovim_projects',
+
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
   --    This is the easiest way to modularize your config.
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
-  -- { import = 'custom.plugins' },
+  require 'custom.plugins.init',
   --
   -- For additional information with loading, sourcing and examples see `:help lazy.nvim-🔌-plugin-spec`
   -- Or use telescope!
