@@ -5,6 +5,7 @@ return {
       -- Project directories
       projects = {
         '~/.config/nvim/',
+        '~/journee/ojin/*',
         '~/journee/ojin/managed-models/avatar',
         '~/journee/ojin/managed-models/tts',
         '~/journee/ojin/inference-proxy/',
@@ -90,7 +91,7 @@ return {
     dependencies = {
       { 'nvim-lua/plenary.nvim' },
       -- optional picker
-      { 'nvim-telescope/telescope.nvim', tag = '0.1.4' },
+      { 'nvim-telescope/telescope.nvim' },
       -- optional picker
       { 'ibhagwan/fzf-lua' },
       -- optional picker

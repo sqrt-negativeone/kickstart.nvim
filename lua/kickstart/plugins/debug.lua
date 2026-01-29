@@ -20,6 +20,7 @@ return {
     -- Installs the debug adapters for you
     'mason-org/mason.nvim',
     'jay-babu/mason-nvim-dap.nvim',
+    'theHamsta/nvim-dap-virtual-text',
 
     -- Add your own debuggers here
     'leoluz/nvim-dap-go',
@@ -68,6 +69,13 @@ return {
         require('dap').set_breakpoint(vim.fn.input 'Breakpoint condition: ')
       end,
       desc = 'Debug: Set Breakpoint',
+    },
+    {
+      '<leader>?',
+      function()
+        require('dap').eval(nil, { enter = true })
+      end,
+      desc = 'Debug: Evalute under cursor',
     },
     -- Toggle to see last session result. Without this, you can't see session output in case of unhandled exception.
     {

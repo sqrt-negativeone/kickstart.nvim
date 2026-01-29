@@ -383,6 +383,7 @@ require('lazy').setup({
 
   { -- Fuzzy Finder (files, lsp, etc)
     'nvim-telescope/telescope.nvim',
+
     event = 'VimEnter',
     dependencies = {
       'nvim-lua/plenary.nvim',
@@ -519,7 +520,7 @@ require('lazy').setup({
       -- and language tooling communicate in a standardized fashion.
       --
       -- In general, you have a "server" which is some tool built to understand a particular
-      -- language (such as `gopls`, `lua_ls`, `rust_analyzer`, etc.). These Language Servers
+      -- language (such as `gopls`, `lua--language-server`, `rust_analyzer`, etc.). These Language Servers
       -- (sometimes called LSP servers, but that's kind of like ATM Machine) are standalone
       -- processes that communicate with some "client" - in this case, Neovim!
       --
@@ -754,7 +755,7 @@ require('lazy').setup({
       --  - filetypes (table): Override the default list of associated filetypes for the server
       --  - capabilities (table): Override fields in capabilities. Can be used to disable certain LSP features.
       --  - settings (table): Override the default settings passed when initializing the server.
-      --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
+      --        For example, to see the options for `lua--language-server`, you could go to: https://luals.github.io/wiki/settings/
       local servers = {
         clangd = {},
         -- gopls = {},
@@ -790,7 +791,7 @@ require('lazy').setup({
         vim.lsp.enable(name)
       end
 
-      vim.lsp.config('lua_ls', {
+      vim.lsp.config('lua--language-server', {
         on_init = function(client)
           if client.workspace_folders then
             local path = client.workspace_folders[1].name
@@ -819,7 +820,7 @@ require('lazy').setup({
           Lua = {},
         },
       })
-      vim.lsp.enable 'lua_ls'
+      vim.lsp.enable 'lua--language-server'
     end,
   },
 
